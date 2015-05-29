@@ -1,0 +1,6 @@
+name: dslink_mongodb
+description: MongoDB for DSA
+dependencies:
+  dslink:
+    git: https://github.com/IOT-DSA/sdk-dslink-dart.git
+  mongo_dart: "^0.1.47"
