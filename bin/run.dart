@@ -58,15 +58,20 @@ main(List<String> args) async {
           var db = dbForPath(path);
           db.collection(params["collection"]).find().toList().then((data) {
             var keys = data.map((x) => x.keys).expand((it) => it).toSet();
-            keys.remove("_id");
+
             r.columns = keys.map((it) => {
               "name": it,
               "type": "dynamic"
             }).toList();
-            r.update(data.map((x) => x.values.where((it) => it is! ObjectId).toList()).toList());
+            r.update(data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList());
             r.close();
           });
           return r;
+        }),
+        "removeObject": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+          var db = dbForPath(path);
+          await db.collection(params["collection"]).remove(new SelectorBuilder().eq("_id", params["id"]));
+          return {};
         }),
         "dropCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
@@ -115,8 +120,8 @@ class ConnectionNode extends SimpleNode {
     dbs[new Path(path).name] = db;
 
     var x = {
-      "Insert_into_Collection": {
-        r"$name": "Insert into Collection",
+      "Insert_Object": {
+        r"$name": "Insert Object",
         r"$is": "insertIntoCollection",
         r"$invokable": "write",
         r"$params": [
@@ -127,6 +132,21 @@ class ConnectionNode extends SimpleNode {
           {
             "name": "object",
             "type": "map"
+          }
+        ]
+      },
+      "Remove_Object": {
+        r"$name": "Remove Object",
+        r"$is": "removeObject",
+        r"$invokable": "write",
+        r"$params": [
+          {
+            "name": "collection",
+            "type": "string"
+          },
+          {
+            "name": "id",
+            "type": "string"
           }
         ]
       },
