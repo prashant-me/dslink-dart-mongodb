@@ -30,6 +30,49 @@ main(List<String> args) async {
       profiles: {
         "connection": (String path) => new ConnectionNode(path),
         "deleteConnection": (String path) => new DeleteConnectionNode(path),
+        "editConnection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+          var name = params["name"];
+          var oldName = path.split("/")[1];
+          ConnectionNode conn = link["/${oldName}"];
+          if (name != null && name != oldName) {
+            if ((link.provider as SimpleNodeProvider).nodes.containsKey("/${name}")) {
+              return {
+                "success": false,
+                "message": "Connection '${name}' already exists."
+              };
+            } else {
+              var n = conn.serialize(false);
+              link.removeNode("/${oldName}");
+              link.addNode("/${name}", n);
+              (link.provider as SimpleNodeProvider).nodes.remove("/${oldName}");
+              conn = link["/${name}"];
+            }
+          }
+
+          link.save();
+
+          var url = params["url"];
+          var oldUrl = conn.configs[r"$$mongo_url"];
+
+          if (url != null && oldUrl != url) {
+            conn.configs[r"$$mongo_url"] = url;
+            try {
+              await conn.setup();
+            } catch (e) {
+              return {
+                "success": false,
+                "message": "Failed to connect to database: ${e}"
+              };
+            }
+          }
+
+          link.save();
+
+          return {
+            "success": true,
+            "message": "Success!"
+          };
+        }),
         "createConnection": (String path) => new CreateConnectionNode(path),
         "listCollections": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
@@ -78,7 +121,8 @@ main(List<String> args) async {
           return {};
         })
       },
-      autoInitialize: false
+      autoInitialize: false,
+      encodePrettyJson: true
   );
 
   link.init();
@@ -111,12 +155,19 @@ class ConnectionNode extends SimpleNode {
   }
 
   setup() async {
+    var name = new Path(path).name;
+
+    if (dbs.containsKey(name)) {
+      await dbs[name].close();
+      dbs.remove(name);
+    }
+
     var url = configs[r"$$mongo_url"];
     Db db = new Db(url);
 
     await db.open();
 
-    dbs[new Path(path).name] = db;
+    dbs[name] = db;
 
     var x = {
       "Insert_Object": {
@@ -182,6 +233,34 @@ class ConnectionNode extends SimpleNode {
         r"$columns": [
           {
             "name": "name",
+            "type": "string"
+          }
+        ]
+      },
+      "Edit_Connection": {
+        r"$name": "Edit Connection",
+        r"$is": "editConnection",
+        r"$invokable": "write",
+        r"$result": "values",
+        r"$params": [
+          {
+            "name": "name",
+            "type": "string",
+            "default": name
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "default": url
+          }
+        ],
+        r"$columns": [
+          {
+            "name": "success",
+            "type": "bool"
+          },
+          {
+            "name": "message",
             "type": "string"
           }
         ]
