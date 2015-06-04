@@ -102,9 +102,14 @@ main(List<String> args) async {
           var sortByField = params["sortByField"];
           var sortDirection = params["sortDirection"];
           var fields = params["fields"];
+          var explain = params["explain"];
 
           if (fields == null) {
             fields = [];
+          }
+
+          if (explain == null) {
+            explain = false;
           }
 
           if (fields is String) {
@@ -124,6 +129,10 @@ main(List<String> args) async {
 
           if (fields != null && fields.isNotEmpty) {
             builder.fields(fields);
+          }
+
+          if (explain) {
+            builder.explain();
           }
 
           if (sortByField != null) {
@@ -261,6 +270,10 @@ class ConnectionNode extends SimpleNode {
           {
             "name": "sortDirection",
             "type": "enum[ascending,descending]"
+          },
+          {
+            "name": "explain",
+            "type": "bool"
           }
         ],
         r"$columns": []
