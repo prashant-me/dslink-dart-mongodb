@@ -98,7 +98,43 @@ main(List<String> args) async {
         "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) {
           var r = new AsyncTableResult();
           var db = dbForPath(path);
-          db.collection(params["collection"]).find().toList().then((data) {
+          var limit = params["limit"];
+          var sortByField = params["sortByField"];
+          var sortDirection = params["sortDirection"];
+          var fields = params["fields"];
+
+          if (fields == null) {
+            fields = [];
+          }
+
+          if (fields is String) {
+            fields = fields.split(",");
+          }
+
+          var descending = false;
+
+          if (sortDirection == "descending") {
+            descending = true;
+          }
+
+          var builder = new SelectorBuilder();
+          if (limit != null) {
+            builder.limit(limit);
+          }
+
+          if (fields != null && fields.isNotEmpty) {
+            builder.fields(fields);
+          }
+
+          if (sortByField != null) {
+            if (sortByField == "") {
+              sortByField = null;
+            } else {
+              builder.sortBy(sortByField, descending: descending);
+            }
+          }
+
+          db.collection(params["collection"]).find(builder).toList().then((data) {
             var keys = data.map((x) => x.keys).expand((it) => it).toSet();
 
             r.columns = keys.map((it) => {
@@ -201,7 +237,7 @@ class ConnectionNode extends SimpleNode {
         ]
       },
       "Get_Collection": {
-        r"$name": "Get Collection",
+        r"$name": "Find Objects",
         r"$is": "getCollection",
         r"$invokable": "write",
         r"$result": "table",
@@ -209,6 +245,22 @@ class ConnectionNode extends SimpleNode {
           {
             "name": "collection",
             "type": "string"
+          },
+          {
+            "name": "limit",
+            "type": "number"
+          },
+          {
+            "name": "fields",
+            "type": "list"
+          },
+          {
+            "name": "sortByField",
+            "type": "string"
+          },
+          {
+            "name": "sortDirection",
+            "type": "enum[ascending,descending]"
           }
         ],
         r"$columns": []
