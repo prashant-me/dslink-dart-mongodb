@@ -261,7 +261,7 @@ class ConnectionNode extends SimpleNode {
           },
           {
             "name": "fields",
-            "type": "list"
+            "type": "array"
           },
           {
             "name": "sortByField",
