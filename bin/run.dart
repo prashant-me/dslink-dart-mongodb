@@ -1,4 +1,3 @@
-import "dart:async";
 import "dart:convert";
 
 import "package:mongo_dart/mongo_dart.dart";
@@ -19,11 +18,15 @@ main(List<String> args) async {
           r"$params": [
             {
               "name": "name",
-              "type": "string"
+              "type": "string",
+              "description": "Connection Name",
+              "placeholder": "mongo"
             },
             {
               "name": "url",
-              "type": "string"
+              "type": "string",
+              "description": "Connection Url",
+              "placeholder": "mongodb://user:password@localhost:8080/mydb"
             }
           ]
         }
@@ -253,11 +256,15 @@ class ConnectionNode extends SimpleNode {
         r"$params": [
           {
             "name": "collection",
-            "type": "string"
+            "type": "string",
+            "description": "Database Collection",
+            "placeholder": "people"
           },
           {
             "name": "object",
-            "type": "map"
+            "type": "map",
+            "description": "Object to Insert",
+            "placeholder": '{"name": "Bob"}'
           }
         ]
       },
@@ -268,11 +275,15 @@ class ConnectionNode extends SimpleNode {
         r"$params": [
           {
             "name": "collection",
-            "type": "string"
+            "type": "string",
+            "description": "Database Collection",
+            "placeholder": "people"
           },
           {
             "name": "id",
-            "type": "string"
+            "type": "string",
+            "description": "Object Id (_id column)",
+            "placeholder": "507f191e810c19729de860ea"
           }
         ]
       },
@@ -285,7 +296,9 @@ class ConnectionNode extends SimpleNode {
           {
             "name": "code",
             "type": "string",
-            "editor": 'textarea'
+            "editor": 'textarea',
+            "description": "JavaScript Code",
+            "placeholder": "db.name"
           }
         ],
         r"$columns": [
@@ -307,27 +320,36 @@ class ConnectionNode extends SimpleNode {
         r"$params": [
           {
             "name": "collection",
-            "type": "string"
+            "type": "string",
+            "description": "Database Collection",
+            "placeholder": "people"
           },
           {
             "name": "limit",
-            "type": "number"
+            "type": "number",
+            "description": "Max Number of Results",
+            "placeholder": "40"
           },
           {
             "name": "fields",
-            "type": "array"
+            "type": "array",
+            "description": "Specific Fields to Access"
           },
           {
             "name": "sortByField",
-            "type": "string"
+            "type": "string",
+            "description": "Field to Sort By",
+            "placeholder": "timestamp"
           },
           {
             "name": "sortDirection",
-            "type": "enum[ascending,descending]"
+            "type": "enum[ascending,descending]",
+            "description": "Sort Direction"
           },
           {
             "name": "explain",
-            "type": "bool"
+            "type": "bool",
+            "description": "Explains what happened"
           }
         ],
         r"$columns": []
@@ -340,7 +362,9 @@ class ConnectionNode extends SimpleNode {
         r"$params": [
           {
             "name": "collection",
-            "type": "string"
+            "type": "string",
+            "description": "Database Collection",
+            "placeholder": "people"
           }
         ]
       },
