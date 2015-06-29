@@ -1,3 +1,4 @@
+import "dart:async";
 import "dart:convert";
 
 import "package:mongo_dart/mongo_dart.dart";
@@ -150,7 +151,8 @@ main(List<String> args) async {
               "name": it,
               "type": "dynamic"
             }).toList();
-            r.update(data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList());
+            var output = data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList();
+            r.update(output);
             r.close();
           });
           return r;
@@ -159,6 +161,35 @@ main(List<String> args) async {
           var db = dbForPath(path);
           await db.collection(params["collection"]).remove(new SelectorBuilder().eq("_id", params["id"]));
           return {};
+        }),
+        "evaluateJavaScript": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+          var code = params["code"];
+          var db = dbForPath(path);
+          var command = new DbCommand(db, DbCommand.SYSTEM_COMMAND_COLLECTION, MongoQueryMessage.OPTS_NONE, 0, -1, {
+            r"$eval": code
+          }, null);
+
+          var result = await db.executeDbCommand(command);
+
+          if (result["ok"] != 1.0) {
+            return [];
+          }
+
+          result = result["retval"];
+
+          var out = [];
+
+          for (var key in result.keys) {
+            var value = result[key];
+
+            if (value is List || value is Map) {
+              value = JSON.encode(value);
+            }
+
+            out.add([key, value]);
+          }
+
+          return out;
         }),
         "dropCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
@@ -242,6 +273,29 @@ class ConnectionNode extends SimpleNode {
           {
             "name": "id",
             "type": "string"
+          }
+        ]
+      },
+      "Evaluate_JavaScript": {
+        r"$name": "Evaluate JavaScript",
+        r"$is": "evaluateJavaScript",
+        r"$invokable": "write",
+        r"$result": "table",
+        r"$params": [
+          {
+            "name": "code",
+            "type": "string",
+            "editor": 'textarea'
+          }
+        ],
+        r"$columns": [
+          {
+            "name": "key",
+            "type": "string"
+          },
+          {
+            "name": "value",
+            "type": "dynamic"
           }
         ]
       },
