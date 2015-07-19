@@ -77,7 +77,7 @@ main(List<String> args) async {
             "message": "Success!"
           };
         }, link.provider),
-        "createConnection": (String path) => new CreateConnectionNode(path, link.provider),
+        "createConnection": (String path) => new CreateConnectionNode(path),
         "listCollections": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
           return (await db.getCollectionNames()).map((x) => [x]);
@@ -210,7 +210,7 @@ main(List<String> args) async {
 }
 
 class CreateConnectionNode extends SimpleNode {
-  CreateConnectionNode(String path) : super(path);
+  CreateConnectionNode(String path) : super(path, link.provider);
 
   @override
   onInvoke(Map<String, dynamic> params) async {
