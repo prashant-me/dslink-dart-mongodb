@@ -76,12 +76,12 @@ main(List<String> args) async {
             "success": true,
             "message": "Success!"
           };
-        }),
-        "createConnection": (String path) => new CreateConnectionNode(path),
+        }, link.provider),
+        "createConnection": (String path) => new CreateConnectionNode(path, link.provider),
         "listCollections": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
           return (await db.getCollectionNames()).map((x) => [x]);
-        }),
+        }, link.provider),
         "insertIntoCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var collection = params["collection"];
           var object = params["object"];
@@ -98,8 +98,8 @@ main(List<String> args) async {
 
           var db = dbForPath(path);
           return await db.collection(collection).insert(object);
-        }),
-        "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) {
+        }, link.provider),
+        "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var r = new AsyncTableResult();
           var db = dbForPath(path);
           var limit = params["limit"];
@@ -164,7 +164,7 @@ main(List<String> args) async {
           var db = dbForPath(path);
           await db.collection(params["collection"]).remove(new SelectorBuilder().eq("_id", params["id"]));
           return {};
-        }),
+        }, link.provider),
         "evaluateJavaScript": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var code = params["code"];
           var db = dbForPath(path);
@@ -193,12 +193,12 @@ main(List<String> args) async {
           }
 
           return out;
-        }),
+        }, link.provider),
         "dropCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
           await db.collection(params["collection"]).drop();
           return {};
-        })
+        }, link.provider)
       },
       autoInitialize: false,
       encodePrettyJson: true
@@ -226,7 +226,7 @@ class CreateConnectionNode extends SimpleNode {
 }
 
 class ConnectionNode extends SimpleNode {
-  ConnectionNode(String path) : super(path);
+  ConnectionNode(String path) : super(path, link.provider);
 
   @override
   void onCreated() {
@@ -426,7 +426,7 @@ class ConnectionNode extends SimpleNode {
 }
 
 class DeleteConnectionNode extends SimpleNode {
-  DeleteConnectionNode(String path) : super(path);
+  DeleteConnectionNode(String path) : super(path, link.provider);
 
   @override
   onInvoke(Map<String, dynamic> params) {
