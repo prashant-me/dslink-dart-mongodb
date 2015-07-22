@@ -1,3 +1,4 @@
+import "dart:async";
 import "dart:convert";
 
 import "package:mongo_dart/mongo_dart.dart";
@@ -99,7 +100,7 @@ main(List<String> args) async {
           var db = dbForPath(path);
           return await db.collection(collection).insert(object);
         }, link.provider),
-        "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async* {
           var r = new AsyncTableResult();
           var db = dbForPath(path);
           var limit = params["limit"];
@@ -147,18 +148,12 @@ main(List<String> args) async {
             }
           }
 
-          db.collection(params["collection"]).find(builder).toList().then((data) {
-            var keys = data.map((x) => x.keys).expand((it) => it).toSet();
-
-            r.columns = keys.map((it) => {
-              "name": it,
-              "type": "dynamic"
-            }).toList();
-            var output = data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList();
-            r.update(output);
-            r.close();
-          });
-          return r;
+          var stream = db.collection(params["collection"]).find(builder);
+          var data = await stream.toList();
+          var keys = data.map((x) => x.keys).expand((it) => it).toSet();
+          yield new TableColumns(keys.map((it) => new TableColumn(it, "dynamic")).toList());
+          var output = data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList();
+          yield* new Stream.fromIterable(output);
         }),
         "removeObject": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
           var db = dbForPath(path);
@@ -315,7 +310,7 @@ class ConnectionNode extends SimpleNode {
       "Get_Collection": {
         r"$name": "Find Objects",
         r"$is": "getCollection",
-        r"$invokable": "write",
+        r"$invokable": "read",
         r"$result": "table",
         r"$params": [
           {
