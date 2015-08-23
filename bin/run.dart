@@ -9,6 +9,7 @@ import "package:dslink/nodes.dart";
 import "package:logging/logging.dart";
 
 LinkProvider link;
+Logger mongoLogger = new Logger("DSA.MongoDB");
 
 main(List<String> args) async {
   link = new LinkProvider(
@@ -184,9 +185,15 @@ main(List<String> args) async {
             return [];
           }
 
+          mongoLogger.fine("Evaluate JavaScript (${code}) => ${result}");
+
           result = result["retval"];
 
           var out = [];
+
+          if (result is BsonObject) {
+            result = result.value;
+          }
 
           if (result is! Map && result is! List) {
             result = [result];
