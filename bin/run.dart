@@ -213,6 +213,7 @@ main(List<String> args) async {
   link.init();
   link.connect();
   link.save();
+
   Logger.root.level = logger.level;
   for (var log in Logger.root.children.values) {
     log.level = logger.level;
@@ -255,6 +256,10 @@ class ConnectionNode extends SimpleNode {
     Db db = new Db(url);
 
     await db.open();
+
+    for (var log in Logger.root.children.values) {
+      log.level = logger.level;
+    }
 
     dbs[name] = db;
 
