@@ -188,6 +188,17 @@ main(List<String> args) async {
 
           var out = [];
 
+          if (result is! Map && result is! List) {
+            result = [result];
+          }
+
+          if (result is List) {
+            var m = {};
+            var i = 0;
+            result.forEach((n) => m[i++] = n);
+            result = m;
+          }
+
           for (var key in result.keys) {
             var value = result[key];
 
