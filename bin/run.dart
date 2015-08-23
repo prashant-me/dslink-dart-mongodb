@@ -3,7 +3,10 @@ import "dart:convert";
 
 import "package:mongo_dart/mongo_dart.dart";
 import "package:dslink/dslink.dart";
+import "package:dslink/utils.dart" show logger;
 import "package:dslink/nodes.dart";
+
+import "package:logging/logging.dart";
 
 LinkProvider link;
 
@@ -210,6 +213,10 @@ main(List<String> args) async {
   link.init();
   link.connect();
   link.save();
+  Logger.root.level = logger.level;
+  for (var log in Logger.root.children.values) {
+    log.level = logger.level;
+  }
 }
 
 class CreateConnectionNode extends SimpleNode {
