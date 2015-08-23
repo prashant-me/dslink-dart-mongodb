@@ -218,6 +218,23 @@ main(List<String> args) async {
   for (var log in Logger.root.children.values) {
     log.level = logger.level;
   }
+
+  Scheduler.every(Interval.FIVE_SECONDS, () {
+    for (var log in Logger.root.children.values) {
+      log.level = logger.level;
+      log.clearListeners();
+      log.onRecord.listen((record) {
+        print("[${log.fullName}][${record.level.name}] ${record.message}");
+        if (record.error != null) {
+          print(record.error);
+        }
+
+        if (record.stackTrace != null) {
+          print(record.stackTrace);
+        }
+      });
+    }
+  });
 }
 
 class CreateConnectionNode extends SimpleNode {
@@ -256,10 +273,6 @@ class ConnectionNode extends SimpleNode {
     Db db = new Db(url);
 
     await db.open();
-
-    for (var log in Logger.root.children.values) {
-      log.level = logger.level;
-    }
 
     dbs[name] = db;
 
