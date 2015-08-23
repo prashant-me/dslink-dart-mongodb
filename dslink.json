@@ -16,6 +16,10 @@
     "name": {
       "type": "string",
       "default": "MongoDB"
+    },
+    "log": {
+      "type": "enum",
+      "default": "info"
     }
   }
 }
