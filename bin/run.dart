@@ -13,219 +13,219 @@ Logger mongoLogger = new Logger("DSA.MongoDB");
 
 main(List<String> args) async {
   link = new LinkProvider(
-      args,
-      "MongoDB-",
-      defaultNodes: {
-        "Create_Connection": {
-          r"$name": "Create Connection",
-          r"$is": "createConnection",
-          r"$invokable": "write",
-          r"$params": [
-            {
-              "name": "name",
-              "type": "string",
-              "description": "Connection Name",
-              "placeholder": "mongo"
-            },
-            {
-              "name": "url",
-              "type": "string",
-              "description": "Connection Url",
-              "placeholder": "mongodb://user:password@localhost:8080/mydb"
-            }
-          ]
+    args,
+    "MongoDB-",
+    defaultNodes: {
+      "Create_Connection": {
+        r"$name": "Create Connection",
+        r"$is": "createConnection",
+        r"$invokable": "write",
+        r"$params": [
+          {
+            "name": "name",
+            "type": "string",
+            "description": "Connection Name",
+            "placeholder": "mongo"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "description": "Connection Url",
+            "placeholder": "mongodb://user:password@localhost:8080/mydb"
+          }
+        ]
+      }
+    },
+    profiles: {
+      "connection": (String path) => new ConnectionNode(path),
+      "deleteConnection": (String path) => new DeleteConnectionNode(path),
+      "editConnection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        var name = params["name"];
+        var oldName = path.split("/")[1];
+        ConnectionNode conn = link["/${oldName}"];
+        if (name != null && name != oldName) {
+          if ((link.provider as SimpleNodeProvider).nodes.containsKey("/${name}")) {
+            return {
+              "success": false,
+              "message": "Connection '${name}' already exists."
+            };
+          } else {
+            var n = conn.serialize(false);
+            link.removeNode("/${oldName}");
+            link.addNode("/${name}", n);
+            (link.provider as SimpleNodeProvider).nodes.remove("/${oldName}");
+            conn = link["/${name}"];
+          }
         }
-      },
-      profiles: {
-        "connection": (String path) => new ConnectionNode(path),
-        "deleteConnection": (String path) => new DeleteConnectionNode(path),
-        "editConnection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
-          var name = params["name"];
-          var oldName = path.split("/")[1];
-          ConnectionNode conn = link["/${oldName}"];
-          if (name != null && name != oldName) {
-            if ((link.provider as SimpleNodeProvider).nodes.containsKey("/${name}")) {
-              return {
-                "success": false,
-                "message": "Connection '${name}' already exists."
-              };
-            } else {
-              var n = conn.serialize(false);
-              link.removeNode("/${oldName}");
-              link.addNode("/${name}", n);
-              (link.provider as SimpleNodeProvider).nodes.remove("/${oldName}");
-              conn = link["/${name}"];
-            }
+
+        link.save();
+
+        var url = params["url"];
+        var oldUrl = conn.configs[r"$$mongo_url"];
+
+        if (url != null && oldUrl != url) {
+          conn.configs[r"$$mongo_url"] = url;
+          try {
+            await conn.setup();
+          } catch (e) {
+            return {
+              "success": false,
+              "message": "Failed to connect to database: ${e}"
+            };
           }
+        }
 
-          link.save();
+        link.save();
 
-          var url = params["url"];
-          var oldUrl = conn.configs[r"$$mongo_url"];
+        return {
+          "success": true,
+          "message": "Success!"
+        };
+      }, link.provider),
+      "createConnection": (String path) => new CreateConnectionNode(path),
+      "listCollections": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        var db = dbForPath(path);
+        return (await db.getCollectionNames()).map((x) => [x]);
+      }, link.provider),
+      "insertIntoCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        var collection = params["collection"];
+        var object = params["object"];
 
-          if (url != null && oldUrl != url) {
-            conn.configs[r"$$mongo_url"] = url;
-            try {
-              await conn.setup();
-            } catch (e) {
-              return {
-                "success": false,
-                "message": "Failed to connect to database: ${e}"
-              };
-            }
-          }
-
-          link.save();
-
-          return {
-            "success": true,
-            "message": "Success!"
-          };
-        }, link.provider),
-        "createConnection": (String path) => new CreateConnectionNode(path),
-        "listCollections": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
-          var db = dbForPath(path);
-          return (await db.getCollectionNames()).map((x) => [x]);
-        }, link.provider),
-        "insertIntoCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
-          var collection = params["collection"];
-          var object = params["object"];
-
-          if (object is String) {
-            try {
-              object = JSON.decode(object);
-            } catch (e) {
-              object = {};
-            }
-          } else if (object is! Map) {
+        if (object is String) {
+          try {
+            object = JSON.decode(object);
+          } catch (e) {
             object = {};
           }
+        } else if (object is! Map) {
+          object = {};
+        }
 
+        var db = dbForPath(path);
+        return await db.collection(collection).insert(object);
+      }, link.provider),
+      "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) {
+        var r = new AsyncTableResult();
+        new Future(() async {
           var db = dbForPath(path);
-          return await db.collection(collection).insert(object);
-        }, link.provider),
-        "getCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) {
-          var r = new AsyncTableResult();
-          new Future(() async {
-            var db = dbForPath(path);
-            var limit = params["limit"];
-            var sortByField = params["sortByField"];
-            var sortDirection = params["sortDirection"];
-            var fields = params["fields"];
-            var explain = params["explain"];
+          var limit = params["limit"];
+          var sortByField = params["sortByField"];
+          var sortDirection = params["sortDirection"];
+          var fields = params["fields"];
+          var explain = params["explain"];
 
-            if (fields == null) {
-              fields = [];
+          if (fields == null) {
+            fields = [];
+          }
+
+          if (explain == null) {
+            explain = false;
+          }
+
+          if (fields is String) {
+            fields = fields.split(",");
+          }
+
+          var descending = false;
+
+          if (sortDirection == "descending") {
+            descending = true;
+          }
+
+          var builder = new SelectorBuilder();
+          if (limit != null) {
+            builder.limit(limit);
+          }
+
+          if (fields != null && fields.isNotEmpty) {
+            builder.fields(fields);
+          }
+
+          if (explain) {
+            builder.explain();
+          }
+
+          if (sortByField != null) {
+            if (sortByField == "") {
+              sortByField = null;
+            } else {
+              builder.sortBy(sortByField, descending: descending);
             }
+          }
 
-            if (explain == null) {
-              explain = false;
-            }
+          db.collection(params["collection"]).find(builder).toList().then((data) {
+            var keys = data.map((x) => x.keys).expand((it) => it).toSet();
 
-            if (fields is String) {
-              fields = fields.split(",");
-            }
-
-            var descending = false;
-
-            if (sortDirection == "descending") {
-              descending = true;
-            }
-
-            var builder = new SelectorBuilder();
-            if (limit != null) {
-              builder.limit(limit);
-            }
-
-            if (fields != null && fields.isNotEmpty) {
-              builder.fields(fields);
-            }
-
-            if (explain) {
-              builder.explain();
-            }
-
-            if (sortByField != null) {
-              if (sortByField == "") {
-                sortByField = null;
-              } else {
-                builder.sortBy(sortByField, descending: descending);
-              }
-            }
-
-            db.collection(params["collection"]).find(builder).toList().then((data) {
-              var keys = data.map((x) => x.keys).expand((it) => it).toSet();
-
-              r.columns = keys.map((it) => {
-                "name": it,
-                "type": "dynamic"
-              }).toList();
-              var output = data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList();
-              r.update(output);
-              r.close();
-            });
+            r.columns = keys.map((it) => {
+              "name": it,
+              "type": "dynamic"
+            }).toList();
+            var output = data.map((x) => x.values.map((it) => it is ObjectId ? (it as ObjectId).toHexString() : it).toList()).toList();
+            r.update(output);
+            r.close();
           });
-          return r;
-        }),
-        "removeObject": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
-          var db = dbForPath(path);
-          await db.collection(params["collection"]).remove(new SelectorBuilder().eq("_id", params["id"]));
-          return {};
-        }, link.provider),
-        "evaluateJavaScript": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
-          var code = params["code"];
-          var db = dbForPath(path);
-          var command = new DbCommand(db, DbCommand.SYSTEM_COMMAND_COLLECTION, MongoQueryMessage.OPTS_NONE, 0, -1, {
-            r"$eval": code
-          }, null);
+        });
+        return r;
+      }),
+      "removeObject": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        var db = dbForPath(path);
+        await db.collection(params["collection"]).remove(new SelectorBuilder().eq("_id", params["id"]));
+        return {};
+      }, link.provider),
+      "evaluateJavaScript": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        var code = params["code"];
+        var db = dbForPath(path);
+        var command = new DbCommand(db, DbCommand.SYSTEM_COMMAND_COLLECTION, MongoQueryMessage.OPTS_NONE, 0, -1, {
+          r"$eval": code
+        }, null);
 
-          var result = await db.executeDbCommand(command);
+        var result = await db.executeDbCommand(command);
 
-          if (result["ok"] != 1.0) {
-            return [];
+        if (result["ok"] != 1.0) {
+          return [];
+        }
+
+        mongoLogger.fine("Evaluate JavaScript (${code}) => ${result}");
+
+        result = result["retval"];
+
+        var out = [];
+
+        if (result is BsonObject) {
+          result = result.value;
+        }
+
+        if (result is! Map && result is! List) {
+          result = [result];
+        }
+
+        if (result is List) {
+          var m = {};
+          var i = 0;
+          result.forEach((n) => m[i++] = n);
+          result = m;
+        }
+
+        for (var key in result.keys) {
+          var value = result[key];
+
+          if (value is List || value is Map) {
+            value = JSON.encode(value);
           }
 
-          mongoLogger.fine("Evaluate JavaScript (${code}) => ${result}");
+          out.add([key, value]);
+        }
 
-          result = result["retval"];
-
-          var out = [];
-
-          if (result is BsonObject) {
-            result = result.value;
-          }
-
-          if (result is! Map && result is! List) {
-            result = [result];
-          }
-
-          if (result is List) {
-            var m = {};
-            var i = 0;
-            result.forEach((n) => m[i++] = n);
-            result = m;
-          }
-
-          for (var key in result.keys) {
-            var value = result[key];
-
-            if (value is List || value is Map) {
-              value = JSON.encode(value);
-            }
-
-            out.add([key, value]);
-          }
-
-          return out;
-        }, link.provider),
-        "dropCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
-          var db = dbForPath(path);
-          await db.collection(params["collection"]).drop();
-          return {};
-        }, link.provider)
-      },
-      autoInitialize: false,
-      encodePrettyJson: true
+        return out;
+      }, link.provider),
+      "dropCollection": (String path) => new SimpleActionNode(path, (Map<String, dynamic> params) async {
+        var db = dbForPath(path);
+        await db.collection(params["collection"]).drop();
+        return {};
+      }, link.provider)
+    },
+    autoInitialize: false,
+    encodePrettyJson: true
   );
 
   link.init();
