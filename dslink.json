@@ -20,6 +20,9 @@
     "log": {
       "type": "enum",
       "default": "info"
+    },
+    "token": {
+      "type": "string"
     }
   }
 }
