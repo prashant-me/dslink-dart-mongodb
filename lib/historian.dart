@@ -473,6 +473,9 @@ abstract class HistorianDatabaseAdapter {
 
   Future purgeGroup(String group, TimeRange range);
 
+  addWatchPathExtensions(WatchPathNode node) {}
+  addWatchGroupExtensions(WatchGroupNode node) {}
+
   Future close();
 }
 
@@ -629,6 +632,8 @@ class WatchPathNode extends SimpleNode {
     if (link.val("${path}/enabled") == true) {
       sub();
     }
+
+    group.db.database.addWatchPathExtensions(this);
   }
 
   ReqSubscribeListener valueSub;
@@ -786,6 +791,8 @@ class WatchGroupNode extends SimpleNode {
       ],
       r"$is": "purgeGroup"
     });
+
+    db.database.addWatchGroupExtensions(this);
   }
 
   Stream<ValuePair> fetchHistory(String path, TimeRange range) {
