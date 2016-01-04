@@ -187,5 +187,12 @@ main(List<String> args) async {
   }
 
   var adapter = new MongoHistorianAdapter();
+
+  new Future.delayed(const Duration(seconds: 5), () async {
+    if (link != null) {
+      link.save();
+    }
+  });
+
   return historianMain(args, "MongoDB", adapter);
 }
