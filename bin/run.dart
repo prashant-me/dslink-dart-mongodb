@@ -1,7 +1,10 @@
 import "dart:async";
+import "dart:io";
 
-import "package:dslink_mongodb/historian.dart";
+import "package:dslink/historian.dart";
 import "package:mongo_dart/mongo_dart.dart";
+
+import "run_old.dart" as Old;
 
 class MongoHistorianAdapter extends HistorianAdapter {
   @override
@@ -151,6 +154,38 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 }
 
 main(List<String> args) async {
+  args = new List<String>.from(args);
+  String argString = args.toString();
+
+  if (args.contains("--old")) {
+    try {
+      var idx = args.indexOf("--old");
+      args.removeAt(idx);
+      args.removeAt(idx);
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  var file = new File("nodes.json");
+  var useOldCode = false;
+  if (await file.exists()) {
+    var content = await file.readAsString();
+    if (content.contains("Create_Connection") &&
+      content.contains("Connection Name")) {
+      print(
+        "== NOTICE: Going into Compatibility Mode."
+          " Delete the nodes.json file to use"
+          " the new MongoDB Historian. =="
+      );
+      useOldCode = true;
+    }
+  }
+
+  if (argString.contains("--old, true") || useOldCode) {
+    return Old.main(args);
+  }
+
   var adapter = new MongoHistorianAdapter();
   return historianMain(args, "MongoDB", adapter);
 }

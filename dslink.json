@@ -23,6 +23,10 @@
     },
     "token": {
       "type": "string"
+    },
+    "old": {
+      "type": "bool",
+      "default": false
     }
   }
 }
