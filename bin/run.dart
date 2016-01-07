@@ -1,6 +1,7 @@
 import "dart:async";
 import "dart:io";
 
+import "package:dslink/dslink.dart";
 import "package:dslink/historian.dart";
 import "package:mongo_dart/mongo_dart.dart";
 
@@ -45,8 +46,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       timeMap[r"$lte"] = range.end;
     }
 
-    await for (Map map in db.collection(group).find({
-      "path": path,
+    await for (Map map in db.collection("${group}:${path}").find({
       "timestamp":  timeMap
     })) {
       var timestamp = map["timestamp"];
@@ -67,9 +67,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   @override
   Future<HistorySummary> getSummary(String group, String path) async {
     var selector = new SelectorBuilder();
-    selector.eq("path", path);
     selector.sortBy("timestamp");
-    var first = await db.collection(group).findOne(selector);
+    var first = await db.collection("${group}:${path}").findOne(selector);
     selector = new SelectorBuilder();
     selector.eq("path", path);
     selector.sortBy("timestamp", descending: true);
@@ -98,9 +97,14 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       timeMap[r"$lte"] = range.end;
     }
 
-    await db.collection(group).remove({
-      "timestamp": timeMap
-    });
+    List<String> names = await db.getCollectionNames();
+    for (String name in names) {
+      if (name.startsWith("${group}:")) {
+        await db.collection(name).remove({
+          "timestamp": timeMap
+        });
+      }
+    }
   }
 
   @override
@@ -115,8 +119,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       timeMap[r"$lte"] = range.end;
     }
 
-    await db.collection(group).remove({
-      "path": path,
+    await db.collection("${group}:${path}").remove({
       "timestamp": timeMap
     });
   }
@@ -125,24 +128,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   Future store(List<ValueEntry> entries) async {
     entries.forEach(entryStream.add);
 
-    Map<String, List<ValueEntry>> map = {};
     for (var entry in entries) {
-      if (map[entry.group] is! Map) {
-        map[entry.group] = [];
-      }
-      map[entry.group].add(entry);
-    }
-
-    for (String group in map.keys) {
-      Iterable<Map> e = map[group].map((entry) {
-        return {
-          "path": entry.path,
-          "timestamp": entry.time,
-          "value": entry.value
-        };
-      }).toList();
-
-      await db.collection(group).insertAll(e);
+      await db.collection("${entry.group}:${entry.path}");
     }
   }
 
@@ -150,6 +137,61 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   Future close() async {
     await entryStream.close();
     await db.close();
+  }
+
+  @override
+  addWatchPathExtensions(WatchPathNode node) async {
+    link.requester.list(node.valuePath).listen((RequesterListUpdate update) async {
+      if (update.node.attributes[r"@geo"] != false && update.changes.contains("@geo")) {
+        var val = update.node.attributes["@geo"];
+        await db.ensureIndex("${node.group.name}:${node.valuePath}", keys: {
+          "value": val is String ? val : "2dsphere"
+        });
+      }
+    });
+
+    link.addNode("${node.path}/geoquerynear", {
+      r"$is": "geoquerynear",
+      "?watch": node,
+      r"$name": "Geographical Query - Near",
+      r"$params": [
+        {
+          "name": "time",
+          "type": "string",
+          "editor": "daterange"
+        },
+        {
+          "name": "latitude",
+          "type": "number"
+        },
+        {
+          "name": "longitude",
+          "type": "number"
+        },
+        {
+          "name": "maximumDistance",
+          "type": "number",
+          "description": "Maximum Distance in Meters"
+        },
+        {
+          "name": "minimumDistance",
+          "type": "number",
+          "description": "Minimum Distance in Meters"
+        }
+      ],
+      r"$columns": [
+        {
+          "name": "timestamp",
+          "type": "string"
+        },
+        {
+          "name": "location",
+          "type": "dynamic"
+        }
+      ],
+      r"$result": "table",
+      r"$invokable": "read"
+    });
   }
 }
 
@@ -194,5 +236,57 @@ main(List<String> args) async {
     }
   });
 
-  return historianMain(args, "MongoDB", adapter);
+  var result = await historianMain(args, "MongoDB", adapter);
+  provider.addProfile("geoquerynear", (String path) => new GeoqueryNearNode(path));
+  return result;
 }
+
+class GeoqueryNearNode extends SimpleNode {
+  WatchPathNode node;
+
+  GeoqueryNearNode(String path) : super(path);
+
+  @override
+  void load(Map m) {
+    super.load(m);
+  }
+
+  @override
+  onInvoke(Map<String, dynamic> params) async {
+    TimeRange range = parseTimeRange(params["time"]);
+    num latitude = params["latitude"];
+    num longitude = params["longitude"];
+    num minDistance = params["minimumDistance"];
+    num maxDistance = params["maximumDistance"];
+    MongoDatabaseHistorianAdapter rdb = node.group.db.database;
+    Db db = rdb.db;
+
+    var timeMap = {};
+
+    if (range.start != null) {
+      timeMap[r"$gte"] = range.start;
+    }
+
+    if (range.end != null) {
+      timeMap[r"$lte"] = range.end;
+    }
+
+    return await db.collection("${node.group.name}:${node.valuePath}").find({
+      "timestamp": timeMap,
+      "value": {
+        r"$geoNear": {
+          "near": {
+            "type": "Point",
+            "coordinates": [longitude, latitude]
+          },
+          "maxDistance": maxDistance,
+          "minDistance": minDistance
+        }
+      }
+    }).map((Map map) {
+      return [map["timestamp"].toString(), map["value"]];
+    });
+  }
+}
+
+SimpleNodeProvider get provider => link.provider;
