@@ -126,10 +126,15 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 
   @override
   Future store(List<ValueEntry> entries) async {
-    entries.forEach(entryStream.add);
+    if (!entryStream.isClosed) {
+      entries.forEach(entryStream.add);
+    }
 
     for (var entry in entries) {
-      await db.collection("${entry.group}:${entry.path}");
+      await db.collection("${entry.group}:${entry.path}").insert({
+        "timestamp": entry.timestamp,
+        "value": entry.value
+      });
     }
   }
 
@@ -150,9 +155,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       }
     });
 
-    link.addNode("${node.path}/geoquerynear", {
-      r"$is": "geoquerynear",
-      "?watch": node,
+    var geoquery_Near = new GeoqueryNearNode("${node.path}/geoquerynear");
+    geoquery_Near.load({
       r"$name": "Geographical Query - Near",
       r"$params": [
         {
@@ -192,6 +196,10 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       r"$result": "table",
       r"$invokable": "read"
     });
+
+    geoquery_Near.node = node;
+    geoquery_Near.serializable = false;
+    provider.setNode(geoquery_Near.path, geoquery_Near);
   }
 }
 
@@ -237,7 +245,6 @@ main(List<String> args) async {
   });
 
   var result = await historianMain(args, "MongoDB", adapter);
-  provider.addProfile("geoquerynear", (String path) => new GeoqueryNearNode(path));
   return result;
 }
 
