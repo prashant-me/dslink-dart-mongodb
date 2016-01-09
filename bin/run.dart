@@ -210,7 +210,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
         var val = update.node.attributes["@geo"];
         await db.ensureIndex("${node.group.name}:${node.valuePath}", keys: {
           "value": val is String ? val : "2dsphere"
-        }, sparse: true);
+        }, sparse: true, background: true);
       }
 
       if (update.node.attributes["@geo"] != null &&
@@ -383,7 +383,7 @@ class GeoqueryNearNode extends SimpleNode {
         r"$and": ands
       }
     };
-    
+
     return await db.collection("${node.group.displayName}:${node.valuePath}").find(query).map((Map map) {
       if (map[r"$err"] != null) {
         throw new Exception("MongoDB Error: ${map}");
@@ -403,7 +403,10 @@ class GeoqueryNearNode extends SimpleNode {
         lat = val["lat"];
       }
 
-      return [map["timestamp"].toString(), lat, lng];
+      return [map["timestamp"].toString(), {
+        "lat": lat,
+        "lng": lng
+      }];
     });
   }
 }
