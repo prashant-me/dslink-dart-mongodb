@@ -91,7 +91,9 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     }
 
     if (range.end == null) {
-      await for (ValueEntry entry in entryStream.stream) {
+      await for (ValueEntry entry in entryStream.stream.where((x) {
+        return x.group == group && x.path == x.path;
+      })) {
         yield entry.asPair();
       }
     }
