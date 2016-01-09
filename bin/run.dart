@@ -232,6 +232,16 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   @override
   addWatchPathExtensions(WatchPathNode node) async {
     link.requester.list(node.valuePath).listen((RequesterListUpdate update) async {
+      if (!update.node.attributes.containsKey("@@getHistory")) {
+        link.requester.set("${node.valuePath}/@@getHistory", {
+          "@": "merge",
+          "type": "paths",
+          "val": [
+            "${link.remotePath}/${node.group.name}/${node.name}/getHistory"
+          ]
+        });
+      }
+
       if (update.node.attributes[r"@geo"] != false && update.changes.contains("@geo")) {
         var val = update.node.attributes["@geo"];
         await db.ensureIndex("${node.group.name}:${node.valuePath}", keys: {
