@@ -188,9 +188,15 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 
       if (geopoints.contains(entry.path)) {
         if (isValidGeoValue(value)) {
+          var data = value;
+
+          if (data is Map) {
+            data = [data["lng"], data["lat"]];
+          }
+
           value = {
             "type": "Point",
-            "coordinates": value
+            "coordinates": data
           };
         } else {
           logger.warning(
