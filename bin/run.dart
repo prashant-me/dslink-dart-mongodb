@@ -410,23 +410,8 @@ class GeoqueryNearNode extends SimpleNode {
       }
 
       var val = map["value"];
-      var lat = 0.0;
-      var lng = 0.0;
 
-      if (val is List) {
-        lng = val[0];
-        lat = val[1];
-      }
-
-      if (val is Map) {
-        lng = val["lng"];
-        lat = val["lat"];
-      }
-
-      return [map["timestamp"].toString(), {
-        "lat": lat,
-        "lng": lng
-      }];
+      return [map["timestamp"].toString(), val];
     });
   }
 }
