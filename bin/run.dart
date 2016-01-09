@@ -279,7 +279,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
           "type": "dynamic"
         }
       ],
-      r"$result": "table",
+      r"$result": "stream",
       r"$invokable": "read"
     });
 
