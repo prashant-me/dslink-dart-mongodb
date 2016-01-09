@@ -262,6 +262,10 @@ main(List<String> args) async {
     }
   }
 
+  if (args.contains("--old=true") || args.contains("--old=false")) {
+    args.removeWhere((x) => x.startsWith("--old="));
+  }
+
   var file = new File("nodes.json");
   var useOldCode = false;
   if (await file.exists()) {
@@ -277,7 +281,7 @@ main(List<String> args) async {
     }
   }
 
-  if (argString.contains("--old, true") || useOldCode) {
+  if (argString.contains("--old, true") || argString.contains("--old=true") || useOldCode) {
     return Old.main(args);
   }
 
