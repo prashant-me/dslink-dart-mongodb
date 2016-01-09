@@ -232,12 +232,15 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   @override
   addWatchPathExtensions(WatchPathNode node) async {
     link.requester.list(node.valuePath).listen((RequesterListUpdate update) async {
-      if (!update.node.attributes.containsKey("@@getHistory")) {
+      var ghr = "${link.remotePath}/${node.group.db.name}/${node.group.name}/${node.name}/getHistory";
+      var bgh = "${link.remotePath}/${node.group.name}/${node.name}/getHistory";
+      if (!update.node.attributes.containsKey("@@getHistory") ||
+        update.node.attributes["@@getHistory"] == bgh) {
         link.requester.set("${node.valuePath}/@@getHistory", {
           "@": "merge",
           "type": "paths",
           "val": [
-            "${link.remotePath}/${node.group.name}/${node.name}/getHistory"
+            ghr
           ]
         });
       }
