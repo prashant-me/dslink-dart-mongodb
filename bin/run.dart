@@ -5,6 +5,7 @@ import "dart:io";
 import "package:dslink/dslink.dart";
 import "package:dslink/historian.dart";
 import "package:dslink/nodes.dart";
+import "package:dslink/utils.dart";
 
 import "package:mongo_dart/mongo_dart.dart";
 
@@ -163,13 +164,34 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     }
 
     for (var entry in entries) {
-      await db.collection("${entry.group}:${entry.path}").insert({
-        "timestamp": entry.time,
-        "value": geopoints.contains(entry.path) ? {
-          "type": "Point",
-          "coordinates": entry.value
-        } : entry.value
-      });
+      var value = entry.value;
+
+      if (geopoints.contains(entry.path)) {
+        if (isValidGeoValue(value)) {
+          value = {
+            "type": "Point",
+            "coordinates": value
+          };
+        } else {
+          logger.warning(
+            "Value ${value} is not valid for geospatial point in group"
+              " ${entry.group} with path ${entry.path}"
+          );
+        }
+      }
+
+      try {
+        await db.collection("${entry.group}:${entry.path}").insert({
+          "timestamp": entry.time,
+          "value": value
+        });
+      } catch (e, stack) {
+        logger.warning(
+          "Failed to insert value ${value} from group ${entry.group} and path ${entry.path}",
+          e,
+          stack
+        );
+      }
     }
   }
 
@@ -188,7 +210,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
         var val = update.node.attributes["@geo"];
         await db.ensureIndex("${node.group.name}:${node.valuePath}", keys: {
           "value": val is String ? val : "2dsphere"
-        });
+        }, sparse: true);
       }
 
       if (update.node.attributes["@geo"] != null &&
@@ -325,18 +347,25 @@ class GeoqueryNearNode extends SimpleNode {
     MongoDatabaseHistorianAdapter rdb = node.group.db.database;
     Db db = rdb.db;
 
-    var timeMap = {};
+    var ands = [];
 
     if (range.start != null) {
-      timeMap[r"$gte"] = range.start;
+      ands.add({
+        "timestamp": {
+          r"$gte": range.start
+        }
+      });
     }
 
     if (range.end != null) {
-      timeMap[r"$lte"] = range.end;
+      ands.add({
+        "timestamp": {
+          r"$lte": range.end
+        }
+      });
     }
 
-    return await db.collection("${node.group.name}:${node.valuePath}").find({
-      "timestamp": timeMap,
+    ands.add({
       "value": {
         r"$near": {
           r"$geometry": {
@@ -347,11 +376,34 @@ class GeoqueryNearNode extends SimpleNode {
           r"$minDistance": minDistance
         }
       }
-    }).map((Map map) {
+    });
+
+    var query = {
+      r"$query": {
+        r"$and": ands
+      }
+    };
+    
+    return await db.collection("${node.group.displayName}:${node.valuePath}").find(query).map((Map map) {
       if (map[r"$err"] != null) {
         throw new Exception("MongoDB Error: ${map}");
       }
-      return [map["timestamp"].toString(), map["value"]];
+
+      var val = map["value"];
+      var lat = 0.0;
+      var lng = 0.0;
+
+      if (val is List) {
+        lng = val[0];
+        lat = val[1];
+      }
+
+      if (val is Map) {
+        lng = val["lng"];
+        lat = val["lat"];
+      }
+
+      return [map["timestamp"].toString(), lat, lng];
     });
   }
 }
@@ -417,3 +469,39 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
 }
 
 SimpleNodeProvider get provider => link.provider;
+
+bool isValidGeoValue(value) {
+  if (value is! List && value is! Map) {
+    return false;
+  }
+
+  if (value is List) {
+    if (value.length != 2) {
+      return false;
+    }
+
+    var a = value[0];
+    var b = value[1];
+
+    if (a is! num || b is! num) {
+      return false;
+    }
+
+    return isValidLngLat(a, b);
+  } else if (value is Map) {
+    var a = value["lng"];
+    var b = value["lat"];
+
+    if (a is! num || b is! num) {
+      return false;
+    }
+
+    return isValidLngLat(a, b);
+  } else {
+    return false;
+  }
+}
+
+bool isValidLngLat(num lng, num lat) {
+  return lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
+}
