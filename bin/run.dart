@@ -249,6 +249,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 
 main(List<String> args) async {
   args = new List<String>.from(args);
+  args = args.map((m) => m.toString()).toList(); // Weird issues with boolean.
   String argString = args.toString();
 
   if (args.contains("--old")) {
