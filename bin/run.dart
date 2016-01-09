@@ -411,7 +411,7 @@ class GeoqueryNearNode extends SimpleNode {
 
       var val = map["value"];
 
-      return [map["timestamp"].toString(), val];
+      return [[map["timestamp"].toString(), val]];
     });
   }
 }
