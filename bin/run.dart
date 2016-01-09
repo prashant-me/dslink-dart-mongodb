@@ -75,11 +75,29 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 
   @override
   Stream<ValuePair> fetchHistory(String group, String path, TimeRange range) async* {
-    Stream<Map> results = db.collection("${group}:${path}").find(
-      where
-        .gte("timestamp", range.start)
-        .lte("timestamp", range.end)
-    );
+    var ands = [];
+
+    if (range.start != null) {
+      ands.add({
+        "timestamp": {
+          r"$gte": range.start
+        }
+      });
+    }
+
+    if (range.end != null) {
+      ands.add({
+        "timestamp": {
+          r"$lte": range.end
+        }
+      });
+    }
+
+    var query = {
+      r"$and": ands
+    };
+
+    Stream<Map> results = db.collection("${group}:${path}").find(query);
 
     await for (Map map in results) {
       var timestamp = map["timestamp"];
