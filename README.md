@@ -23,7 +23,7 @@ This is the same thing that the mongo command line client utilizes.
 The following will fetch all the data in the `example:/downstream/Example/message` collection.
 
 ```js
-var cursor = db.getCollection("example:/downstream/Example/message");
+var cursor = db.getCollection("example:/downstream/Example/message").find();
 
 return cursor.toArray();
 ```

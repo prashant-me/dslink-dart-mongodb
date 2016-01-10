@@ -1,6 +1,7 @@
 import "dart:async";
 import "dart:convert";
 import "dart:io";
+import "dart:typed_data";
 
 import "package:dslink/dslink.dart";
 import "package:dslink/historian.dart";
@@ -10,7 +11,6 @@ import "package:dslink/utils.dart";
 import "package:mongo_dart/mongo_dart.dart";
 
 import "run_old.dart" as Old;
-import 'dart:typed_data';
 
 class MongoHistorianAdapter extends HistorianAdapter {
   @override
@@ -19,7 +19,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
       "name": "url",
       "type": "string",
       "description": "Connection Url",
-      "placeholder": "mongodb://user:password@localhost:8080/mydb"
+      "placeholder": "mongodb://user:password@localhost/mydb"
     }
   ];
 
@@ -466,8 +466,9 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
   @override
   onInvoke(Map<String, dynamic> params) async {
     MongoDatabaseHistorianAdapter d = node.database;
-    var command = new DbCommand(d.db, DbCommand.SYSTEM_COMMAND_COLLECTION, MongoQueryMessage.OPTS_NONE, 0, -1, {
-      r"$eval": params["code"]
+    var command = new DbCommand(d.db, DbCommand.SYSTEM_COMMAND_COLLECTION, MongoQueryMessage.OPTS_NO_CURSOR_TIMEOUT, 0, -1, {
+      r"$eval": params["code"],
+      r"$nolock": true
     }, null);
 
     var result = await d.db.executeDbCommand(command);
