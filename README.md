@@ -57,7 +57,10 @@ return cursor.toArray();
 
 The following will fetch all the tweets in the `twitter:/downstream/twitter/testTweet/test` collection that have images.
 
+More twitter query examples: http://stats.seandolinar.com/collecting-twitter-data-storing-tweets-in-mongodb/
+
 ```js
+//Note the prepended 'value'
 var cursor = db.getCollection("twitter:/downstream/twitter/testTweet/test")
 .find({"value.extended_entities" : { "$exists" : "true"}})
 .limit(5);
