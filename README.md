@@ -40,3 +40,13 @@ var cursor = db.getCollection("system:/downstream/System/CPU_Usage").find({
 });
 return cursor.toArray();
 ```
+### Filter json documents originating from logging DSA map objects
+
+The following will fetch all the tweets in the `twitter:/downstream/twitter/testTweet/test` collection that have images.
+
+```js
+var cursor = db.getCollection("twitter:/downstream/twitter/testTweet/test")
+.find({"value.extended_entities" : { "$exists" : "true"}})
+.limit(5);
+return cursor.toArray();
+```
