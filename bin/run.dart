@@ -10,6 +10,7 @@ import "package:dslink/utils.dart";
 import "package:mongo_dart/mongo_dart.dart";
 
 import "run_old.dart" as Old;
+import 'dart:typed_data';
 
 class MongoHistorianAdapter extends HistorianAdapter {
   @override
@@ -104,7 +105,10 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       if (timestamp is String) {
         timestamp = DateTime.parse(timestamp);
       }
-      var pair = new ValuePair(timestamp.toString(), map["value"]);
+
+      var val = map["value"];
+      val = encodeMongoObject(val);
+      var pair = new ValuePair(timestamp.toString(), val);
       yield pair;
     }
 
@@ -128,11 +132,12 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     var last = await db.collection(group).findOne(selector);
     var firstPair = first == null ? null : new ValuePair(
       first["timestamp"].toString(),
-      first["value"]
+      encodeMongoObject(first["value"])
     );
+
     var lastPair = last == null ? null : new ValuePair(
       last["timestamp"].toString(),
-      last["value"]
+      encodeMongoObject(last["value"])
     );
     var summary = new HistorySummary(firstPair, lastPair);
     return summary;
@@ -483,17 +488,41 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
     }
 
     if (result is List) {
-      var m = {};
-      var i = 0;
-      result.forEach((n) => m[i++] = n);
-      result = m;
+      if (result.every((x) => x is Map)) {
+        var keys = new Set<String>();
+        for (Map row in result) {
+          keys.addAll(row.keys);
+        }
+
+        var out = [];
+
+        for (Map row in result) {
+          var n = [];
+          for (String key in keys) {
+            n.add(encodeMongoObject(row[key]));
+          }
+          out.add(n);
+        }
+
+        var table = new Table(
+          keys.map((t) => new TableColumn(t, "dynamic")).toList(),
+          out
+        );
+
+        return table;
+      } else {
+        var m = {};
+        var i = 0;
+        result.forEach((n) => m[i++] = n);
+        result = m;
+      }
     }
 
     for (var key in result.keys) {
       var value = result[key];
 
       if (value is List || value is Map) {
-        value = const JsonEncoder().convert(value);
+        value = const JsonEncoder(encodeMongoObject).convert(value);
       }
 
       out.add([key, value]);
@@ -501,6 +530,29 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
 
     return out;
   }
+}
+
+dynamic encodeMongoObject(input) {
+  if (input is ObjectId) {
+    return input.toHexString();
+  } else if (input is DateTime) {
+    return input.toIso8601String();
+  } else if (input is BsonBinary) {
+    return new Uint8List.fromList(input.makeByteList()).buffer.asByteData();
+  } else if (input is Map &&
+    input.keys.length == 2 &&
+    input["type"] == "Point" &&
+    input.keys.contains("coordinates") &&
+    input["coordinates"] is List &&
+    input["coordinates"].length == 2) {
+    var list = input["coordinates"];
+    return {
+      "lat": list[1],
+      "lng": list[0]
+    };
+  }
+
+  return input;
 }
 
 SimpleNodeProvider get provider => link.provider;
