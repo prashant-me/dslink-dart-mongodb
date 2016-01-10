@@ -13,6 +13,19 @@ From there, you can create watch groups which allow you to setup a group of path
 Data is stored in the database with collection names in the format of `{group}:{path}`.
 For a logged point in the group `example` with a path of `/downstream/Example/message`, the collection that stores the history would be `example:/downstream/Example/message`.
 
+## Collection Schema
+
+All logged data has _id, timestamp and value fields. When filtering for content ensure to prepend `value` to your data queries.
+
+Example:
+```js
+{
+  "_id": "5690582905c18833e62e1108",
+  "timestamp": "2016-01-09T00:45:29.010Z",
+  "value": 1153.28515625
+}
+```
+
 ## JavaScript Examples
 
 The `Evaluate JavaScript` action allows you to perform JavaScript evaluation server-side.
