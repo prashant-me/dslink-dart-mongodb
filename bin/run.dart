@@ -471,11 +471,9 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
     }, null);
 
     var result = await d.db.executeDbCommand(command);
-    if (result["ok"] != 1.0) {
-      return [];
+    if (result["ok"] == 1.0) {
+      result = result["retval"];
     }
-
-    result = result["retval"];
 
     var out = [];
 
