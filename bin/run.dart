@@ -549,6 +549,14 @@ dynamic encodeMongoObject(input) {
       "lat": list[1],
       "lng": list[0]
     };
+  } else if (input is Map) {
+    for (var key in input.keys.toList()) {
+      input[key] = encodeMongoObject(input[key]);
+    }
+  } else if (input is List) {
+    for (var i = 0; i < input.length; i++) {
+      input[i] = encodeMongoObject(input[i]);
+    }
   }
 
   return input;
