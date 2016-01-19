@@ -19,7 +19,8 @@ class MongoHistorianAdapter extends HistorianAdapter {
       "name": "url",
       "type": "string",
       "description": "Connection Url",
-      "placeholder": "mongodb://user:password@localhost/mydb"
+      "placeholder": "mongodb://user:password@localhost/mydb",
+      "default": "mongodb://127.0.0.1/dsa"
     }
   ];
 
