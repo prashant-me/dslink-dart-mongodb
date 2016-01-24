@@ -4,8 +4,8 @@ import "package:dslink/dslink.dart";
 import "package:dslink/io.dart";
 
 final String KEY = "AIzaSyC9dyRtyQr1QJZuYlN_2gFsHfRw7COza2s";
-final String ORIGIN = "Atlanta";
-final String DESTINATION = "San+Francisco";
+final String ORIGIN = "Birmingham";
+final String DESTINATION = "Greenville";
 final String BASE = "https://maps.googleapis.com/maps/api/directions/json";
 
 final String URL = "${BASE}?origin=${ORIGIN}&destination=${DESTINATION}&key=${KEY}";
@@ -36,7 +36,7 @@ main() async {
   while (true) {
     for (Map m in out) {
       link.updateValue("/location", m);
-      await new Future.delayed(const Duration(seconds: 1));
+      await new Future.delayed(const Duration(seconds: 2));
     }
 
     out = out.reversed.toList();
