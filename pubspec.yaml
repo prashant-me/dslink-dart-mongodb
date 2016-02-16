@@ -3,5 +3,5 @@ description: MongoDB for DSA
 dependencies:
   dslink:
     git: https://github.com/IOT-DSA/sdk-dslink-dart.git
-  mongo_dart: "^0.2.1"
+  mongo_dart: "^0.2.5+1"
   package_config: "^0.1.3"

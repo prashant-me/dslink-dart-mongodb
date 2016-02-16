@@ -16,7 +16,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
   @override
   List<Map<String, dynamic>> getCreateDatabaseParameters() => [
     {
-      "name": "url",
+      "name": "Url",
       "type": "string",
       "description": "Connection Url",
       "placeholder": "mongodb://user:password@localhost/mydb",
@@ -26,7 +26,11 @@ class MongoHistorianAdapter extends HistorianAdapter {
 
   @override
   Future<HistorianDatabaseAdapter> getDatabase(Map config) async {
-    var db = new Db(config["url"]);
+    String url = config["Url"];
+    if (url == null) {
+      url = config["url"];
+    }
+    var db = new Db(url);
     var adapter = new MongoDatabaseHistorianAdapter();
     adapter.db = db;
     await db.open();
@@ -36,6 +40,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
     DatabaseNode dbn = link.getNode("/${NodeNamer.createName(name)}");
 
     var evalNode = new EvaluateJavaScriptDatabaseNode("${dbn.path}/eval");
+    var dbRowsWrittenNode = new SimpleNode("${dbn.path}/_rows_written");
 
     evalNode.load({
       r"$name": "Evaluate JavaScript",
@@ -63,7 +68,16 @@ class MongoHistorianAdapter extends HistorianAdapter {
       ]
     });
 
+    dbRowsWrittenNode.load({
+      r"$name": "Rows Written",
+      r"$type": "number",
+      "@unit": "rows"
+    });
+
+    adapter.dbRowsWrittenNode = dbRowsWrittenNode;
+
     provider.setNode(evalNode.path, evalNode);
+    provider.setNode(dbRowsWrittenNode.path, dbRowsWrittenNode);
 
     return adapter;
   }
@@ -71,9 +85,31 @@ class MongoHistorianAdapter extends HistorianAdapter {
 
 class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   Db db;
+  Disposable dbStatsTimer;
 
   StreamController<ValueEntry> entryStream =
     new StreamController<ValueEntry>.broadcast();
+
+  SimpleNode dbRowsWrittenNode;
+
+  MongoDatabaseHistorianAdapter() {
+    _setup();
+  }
+
+  void _setup() {
+    dbStatsTimer = Scheduler.safeEvery(Interval.FIVE_SECONDS, () async {
+      if (db != null) {
+        var cmd = await DbCommand.createQueryDbCommand(db, {
+          "dbStats": 1
+        });
+        var stats = await db.executeDbCommand(cmd);
+        num objectCount = stats["objects"];
+        if (dbRowsWrittenNode != null) {
+          dbRowsWrittenNode.updateValue(objectCount.toInt());
+        }
+      }
+    });
+  }
 
   @override
   Stream<ValuePair> fetchHistory(String group, String path, TimeRange range) async* {
