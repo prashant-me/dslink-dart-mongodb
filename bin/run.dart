@@ -384,7 +384,9 @@ main(List<String> args) async {
     }
   }
 
-  if (argString.contains("--old, true") || argString.contains("--old=true") || useOldCode) {
+  if (argString.contains("--old, true") ||
+    argString.contains("--old=true") ||
+    useOldCode) {
     return Old.main(args);
   }
 
