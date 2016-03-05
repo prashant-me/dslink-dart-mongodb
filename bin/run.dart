@@ -144,7 +144,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       }
 
       if (timestamp is DateTime) {
-        timestamp = timestamp.toIso8601String();
+        timestamp = "${timestamp.toIso8601String()}${ValueUpdate.TIME_ZONE}";
       }
 
       var val = map["value"];
