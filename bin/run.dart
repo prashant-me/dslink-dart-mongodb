@@ -143,6 +143,10 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
         timestamp = DateTime.parse(timestamp);
       }
 
+      if (timestamp is DateTime) {
+        timestamp = timestamp.toIso8601String();
+      }
+
       var val = map["value"];
       val = encodeMongoObject(val);
       var pair = new ValuePair(timestamp.toString(), val);
@@ -505,7 +509,12 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
   @override
   onInvoke(Map<String, dynamic> params) async {
     MongoDatabaseHistorianAdapter d = node.database;
-    var command = new DbCommand(d.db, DbCommand.SYSTEM_COMMAND_COLLECTION, MongoQueryMessage.OPTS_NO_CURSOR_TIMEOUT, 0, -1, {
+    var command = new DbCommand(
+      d.db,
+      DbCommand.SYSTEM_COMMAND_COLLECTION,
+      MongoQueryMessage.OPTS_NO_CURSOR_TIMEOUT,
+      0,
+      -1, {
       r"$eval": params["code"],
       r"$nolock": true
     }, null);
