@@ -605,6 +605,8 @@ dynamic encodeMongoObject(input) {
     for (var i = 0; i < input.length; i++) {
       input[i] = encodeMongoObject(input[i]);
     }
+  } else if (input is BsonCode) {
+    return input.data;
   }
 
   return input;
