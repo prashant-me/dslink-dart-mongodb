@@ -585,7 +585,8 @@ dynamic encodeMongoObject(input) {
   } else if (input is DateTime) {
     return input.toIso8601String();
   } else if (input is BsonBinary) {
-    return new Uint8List.fromList(input.makeByteList()).buffer.asByteData();
+    input.makeByteList();
+    return input.byteArray;
   } else if (input is Map &&
     input.keys.length == 2 &&
     input["type"] == "Point" &&
