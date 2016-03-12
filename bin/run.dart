@@ -8,6 +8,8 @@ import "package:dslink/historian.dart";
 import "package:dslink/nodes.dart";
 import "package:dslink/utils.dart";
 
+import "package:stack_trace/stack_trace.dart";
+
 import "package:mongo_dart/mongo_dart.dart";
 
 import "run_old.dart" as Old;
@@ -30,10 +32,14 @@ class MongoHistorianAdapter extends HistorianAdapter {
     if (url == null) {
       url = config["url"];
     }
-    var db = new Db(url);
-    var adapter = new MongoDatabaseHistorianAdapter();
-    adapter.db = db;
-    await db.open();
+
+    MongoDatabaseHistorianAdapter adapter;
+    await Chain.capture(() async {
+      var db = new Db(url);
+      adapter = new MongoDatabaseHistorianAdapter();
+      adapter.db = db;
+      await db.open();
+    }, when: const bool.fromEnvironment("dsa.mode.debug", defaultValue: false));
 
     String name = config["Name"];
 
@@ -546,7 +552,7 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
         for (Map row in result) {
           var n = [];
           for (String key in keys) {
-            n.add(encodeMongoObject(row[key]));
+            n.add(row[key]);
           }
           out.add(n);
         }
@@ -569,7 +575,7 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
       var value = result[key];
 
       if (value is List || value is Map) {
-        value = const JsonEncoder(encodeMongoObject).convert(value);
+        value = const JsonEncoder().convert(encodeMongoObject(value));
       }
 
       out.add([key, value]);
