@@ -98,17 +98,25 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 
   SimpleNode dbRowsWrittenNode;
 
+  bool get connected => db.state == State.OPEN;
+
   MongoDatabaseHistorianAdapter() {
     _setup();
   }
 
   void _setup() {
     dbStatsTimer = Scheduler.safeEvery(Interval.FIVE_SECONDS, () async {
-      if (db != null) {
+      if (db != null && connected) {
         var cmd = await DbCommand.createQueryDbCommand(db, {
           "dbStats": 1
         });
-        var stats = await db.executeDbCommand(cmd);
+        Map stats;
+        try {
+          stats = await db.executeDbCommand(cmd);
+        } catch (e, s) {
+          logger.warning('Error trying to execute DB command', e, s);
+          return;
+        }
         num objectCount = stats["objects"];
         if (dbRowsWrittenNode != null) {
           dbRowsWrittenNode.updateValue(objectCount.toInt());
