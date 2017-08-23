@@ -76,7 +76,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
           "type": "number",
           "default": 0,
           "description": "Amount of results to skip for the query",
-        },
+        }
       ],
       r'$columns': [
         {'name': 'success', 'type': 'bool', 'default': false},
