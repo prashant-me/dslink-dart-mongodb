@@ -17,14 +17,14 @@ import "run_old.dart" as Old;
 class MongoHistorianAdapter extends HistorianAdapter {
   @override
   List<Map<String, dynamic>> getCreateDatabaseParameters() => [
-    {
-      "name": "Url",
-      "type": "string",
-      "description": "Connection Url",
-      "placeholder": "mongodb://user:password@localhost/mydb",
-      "default": "mongodb://127.0.0.1/dsa"
-    }
-  ];
+        {
+          "name": "Url",
+          "type": "string",
+          "description": "Connection Url",
+          "placeholder": "mongodb://user:password@localhost/mydb",
+          "default": "mongodb://127.0.0.1/dsa"
+        }
+      ];
 
   @override
   Future<HistorianDatabaseAdapter> getDatabase(Map config) async {
@@ -46,8 +46,31 @@ class MongoHistorianAdapter extends HistorianAdapter {
     DatabaseNode dbn = link.getNode("/${NodeNamer.createName(name)}");
 
     var evalNode = new EvaluateJavaScriptDatabaseNode("${dbn.path}/eval");
+    var evalQueryNode = new EvaluateRawQueryNode("${dbn.path}/evalQuery");
     var dbRowsWrittenNode = new SimpleNode("${dbn.path}/_rows_written");
 
+    evalQueryNode.load({
+      r"$name": "Evaluate Raw Query",
+      r"$is": "evaluateRawQuery",
+      r"$invokable": "write",
+      r"$params": [
+        {
+          "name": "collectionName",
+          "type": "string",
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "editor": 'textarea',
+          "description": "Raw query code",
+          "placeholder": "db.name"
+        },
+      ],
+      r'$columns': [
+        {'name': 'success', 'type': 'bool', 'default': false},
+        {'name': 'message', 'type': 'string', 'default': ''}
+      ]
+    });
     evalNode.load({
       r"$name": "Evaluate JavaScript",
       r"$is": "evaluateJavaScript",
@@ -63,26 +86,18 @@ class MongoHistorianAdapter extends HistorianAdapter {
         }
       ],
       r"$columns": [
-        {
-          "name": "key",
-          "type": "string"
-        },
-        {
-          "name": "value",
-          "type": "dynamic"
-        }
+        {"name": "key", "type": "string"},
+        {"name": "value", "type": "dynamic"}
       ]
     });
 
-    dbRowsWrittenNode.load({
-      r"$name": "Rows Written",
-      r"$type": "number",
-      "@unit": "rows"
-    });
+    dbRowsWrittenNode
+        .load({r"$name": "Rows Written", r"$type": "number", "@unit": "rows"});
 
     adapter.dbRowsWrittenNode = dbRowsWrittenNode;
 
     provider.setNode(evalNode.path, evalNode);
+    provider.setNode(evalQueryNode.path, evalQueryNode);
     provider.setNode(dbRowsWrittenNode.path, dbRowsWrittenNode);
 
     return adapter;
@@ -94,7 +109,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   Disposable dbStatsTimer;
 
   StreamController<ValueEntry> entryStream =
-    new StreamController<ValueEntry>.broadcast();
+      new StreamController<ValueEntry>.broadcast();
 
   SimpleNode dbRowsWrittenNode;
 
@@ -107,9 +122,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   void _setup() {
     dbStatsTimer = Scheduler.safeEvery(Interval.FIVE_SECONDS, () async {
       if (db != null && connected) {
-        var cmd = await DbCommand.createQueryDbCommand(db, {
-          "dbStats": 1
-        });
+        var cmd = await DbCommand.createQueryDbCommand(db, {"dbStats": 1});
         Map stats;
         try {
           stats = await db.executeDbCommand(cmd);
@@ -126,28 +139,23 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   }
 
   @override
-  Stream<ValuePair> fetchHistory(String group, String path, TimeRange range) async* {
+  Stream<ValuePair> fetchHistory(
+      String group, String path, TimeRange range) async* {
     var ands = [];
 
     if (range.start != null) {
       ands.add({
-        "timestamp": {
-          r"$gte": range.start
-        }
+        "timestamp": {r"$gte": range.start}
       });
     }
 
     if (range.end != null) {
       ands.add({
-        "timestamp": {
-          r"$lte": range.end
-        }
+        "timestamp": {r"$lte": range.end}
       });
     }
 
-    var query = {
-      r"$and": ands
-    };
+    var query = {r"$and": ands};
 
     Stream<Map> results = db.collection("${group}:${path}").find(query);
 
@@ -185,15 +193,15 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     selector.eq("path", path);
     selector.sortBy("timestamp", descending: true);
     var last = await db.collection(group).findOne(selector);
-    var firstPair = first == null ? null : new ValuePair(
-      first["timestamp"].toString(),
-      encodeMongoObject(first["value"])
-    );
+    var firstPair = first == null
+        ? null
+        : new ValuePair(
+            first["timestamp"].toString(), encodeMongoObject(first["value"]));
 
-    var lastPair = last == null ? null : new ValuePair(
-      last["timestamp"].toString(),
-      encodeMongoObject(last["value"])
-    );
+    var lastPair = last == null
+        ? null
+        : new ValuePair(
+            last["timestamp"].toString(), encodeMongoObject(last["value"]));
     var summary = new HistorySummary(firstPair, lastPair);
     return summary;
   }
@@ -213,9 +221,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     List<String> names = await db.getCollectionNames();
     for (String name in names) {
       if (name.startsWith("${group}:")) {
-        await db.collection(name).remove({
-          "timestamp": timeMap
-        });
+        await db.collection(name).remove({"timestamp": timeMap});
       }
     }
   }
@@ -232,9 +238,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
       timeMap[r"$lte"] = range.end;
     }
 
-    await db.collection("${group}:${path}").remove({
-      "timestamp": timeMap
-    });
+    await db.collection("${group}:${path}").remove({"timestamp": timeMap});
   }
 
   @override
@@ -254,29 +258,23 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
             data = [data["lng"], data["lat"]];
           }
 
-          value = {
-            "type": "Point",
-            "coordinates": data
-          };
+          value = {"type": "Point", "coordinates": data};
         } else {
           logger.warning(
-            "Value ${value} is not valid for geospatial point in group"
-              " ${entry.group} with path ${entry.path}"
-          );
+              "Value ${value} is not valid for geospatial point in group"
+              " ${entry.group} with path ${entry.path}");
         }
       }
 
       try {
-        await db.collection("${entry.group}:${entry.path}").insert({
-          "timestamp": entry.time,
-          "value": value
-        });
+        await db
+            .collection("${entry.group}:${entry.path}")
+            .insert({"timestamp": entry.time, "value": value});
       } catch (e, stack) {
         logger.warning(
-          "Failed to insert value ${value} from group ${entry.group} and path ${entry.path}",
-          e,
-          stack
-        );
+            "Failed to insert value ${value} from group ${entry.group} and path ${entry.path}",
+            e,
+            stack);
       }
     }
   }
@@ -291,29 +289,32 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
 
   @override
   addWatchPathExtensions(WatchPathNode node) async {
-    link.requester.list(node.valuePath).listen((RequesterListUpdate update) async {
-      var ghr = "${link.remotePath}/${node.group.db.name}/${node.group.name}/${node.name}/getHistory";
+    link.requester
+        .list(node.valuePath)
+        .listen((RequesterListUpdate update) async {
+      var ghr =
+          "${link.remotePath}/${node.group.db.name}/${node.group.name}/${node.name}/getHistory";
       var bgh = "${link.remotePath}/${node.group.name}/${node.name}/getHistory";
       if (!update.node.attributes.containsKey("@@getHistory") ||
-        update.node.attributes["@@getHistory"] == bgh) {
+          update.node.attributes["@@getHistory"] == bgh) {
         link.requester.set("${node.valuePath}/@@getHistory", {
           "@": "merge",
           "type": "paths",
-          "val": [
-            ghr
-          ]
+          "val": [ghr]
         });
       }
 
-      if (update.node.attributes[r"@geo"] != false && update.changes.contains("@geo")) {
+      if (update.node.attributes[r"@geo"] != false &&
+          update.changes.contains("@geo")) {
         var val = update.node.attributes["@geo"];
-        await db.ensureIndex("${node.group.name}:${node.valuePath}", keys: {
-          "value": val is String ? val : "2dsphere"
-        }, sparse: true, background: true);
+        await db.ensureIndex("${node.group.name}:${node.valuePath}",
+            keys: {"value": val is String ? val : "2dsphere"},
+            sparse: true,
+            background: true);
       }
 
       if (update.node.attributes["@geo"] != null &&
-        update.node.attributes["@geo"] != false) {
+          update.node.attributes["@geo"] != false) {
         geopoints.add(node.valuePath);
       } else {
         geopoints.remove(node.valuePath);
@@ -324,19 +325,9 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     geoquery_Near.load({
       r"$name": "Geographical Query - Near",
       r"$params": [
-        {
-          "name": "time",
-          "type": "string",
-          "editor": "daterange"
-        },
-        {
-          "name": "latitude",
-          "type": "number"
-        },
-        {
-          "name": "longitude",
-          "type": "number"
-        },
+        {"name": "time", "type": "string", "editor": "daterange"},
+        {"name": "latitude", "type": "number"},
+        {"name": "longitude", "type": "number"},
         {
           "name": "maximumDistance",
           "type": "number",
@@ -349,14 +340,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
         }
       ],
       r"$columns": [
-        {
-          "name": "timestamp",
-          "type": "string"
-        },
-        {
-          "name": "location",
-          "type": "dynamic"
-        }
+        {"name": "timestamp", "type": "string"},
+        {"name": "location", "type": "dynamic"}
       ],
       r"$result": "stream",
       r"$invokable": "read"
@@ -392,19 +377,17 @@ main(List<String> args) async {
   if (await file.exists()) {
     var content = await file.readAsString();
     if (content.contains("Create_Connection") &&
-      content.contains("Connection Name")) {
-      print(
-        "== NOTICE: Going into Compatibility Mode."
+        content.contains("Connection Name")) {
+      print("== NOTICE: Going into Compatibility Mode."
           " Delete the nodes.json file to use"
-          " the new MongoDB Historian. =="
-      );
+          " the new MongoDB Historian. ==");
       useOldCode = true;
     }
   }
 
   if (argString.contains("--old, true") ||
-    argString.contains("--old=true") ||
-    useOldCode) {
+      argString.contains("--old=true") ||
+      useOldCode) {
     return Old.main(args);
   }
 
@@ -452,17 +435,13 @@ class GeoqueryNearNode extends SimpleNode {
 
     if (range.start != null) {
       ands.add({
-        "timestamp": {
-          r"$gte": range.start
-        }
+        "timestamp": {r"$gte": range.start}
       });
     }
 
     if (range.end != null) {
       ands.add({
-        "timestamp": {
-          r"$lte": range.end
-        }
+        "timestamp": {r"$lte": range.end}
       });
     }
 
@@ -480,12 +459,13 @@ class GeoqueryNearNode extends SimpleNode {
     });
 
     var query = {
-      r"$query": {
-        r"$and": ands
-      }
+      r"$query": {r"$and": ands}
     };
 
-    return await db.collection("${node.group.displayName}:${node.valuePath}").find(query).map((Map map) {
+    return await db
+        .collection("${node.group.displayName}:${node.valuePath}")
+        .find(query)
+        .map((Map map) {
       if (map[r"$err"] != null) {
         throw new Exception("MongoDB Error: ${map}");
       }
@@ -494,13 +474,12 @@ class GeoqueryNearNode extends SimpleNode {
 
       if (val is Map && val["type"] == "Point") {
         var coords = val["coordinates"];
-        val = {
-          "lat": coords[1],
-          "lng": coords[0]
-        };
+        val = {"lat": coords[1], "lng": coords[0]};
       }
 
-      return [[map["timestamp"].toString(), val]];
+      return [
+        [map["timestamp"].toString(), val]
+      ];
     });
   }
 }
@@ -508,6 +487,35 @@ class GeoqueryNearNode extends SimpleNode {
 class ColumnsMarker {
   List columns;
   List rows;
+}
+
+class EvaluateRawQueryNode extends SimpleNode {
+  DatabaseNode node;
+
+  EvaluateRawQueryNode(String path) : super(path);
+
+  @override
+  onCreated() {
+    node = link.getNode(new Path(path).parentPath);
+  }
+
+  @override
+  onInvoke(Map<String, dynamic> params) async {
+    MongoDatabaseHistorianAdapter d = node.database;
+
+    var collectionName = params['collectionName'];
+    var query = params['code'];
+
+    var collection = d.db.collection(collectionName);
+
+    SelectorBuilder sb = new SelectorBuilder();
+    sb.raw(JSON.decode(query));
+    var c = new Cursor(d.db, collection, sb);
+
+    var res = await c.stream.toList();
+
+    return {'success': true, 'message': JSON.encode(res)};
+  }
 }
 
 class EvaluateJavaScriptDatabaseNode extends SimpleNode {
@@ -524,14 +532,13 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
   onInvoke(Map<String, dynamic> params) async {
     MongoDatabaseHistorianAdapter d = node.database;
     var command = new DbCommand(
-      d.db,
-      DbCommand.SYSTEM_COMMAND_COLLECTION,
-      MongoQueryMessage.OPTS_NO_CURSOR_TIMEOUT,
-      0,
-      -1, {
-      r"$eval": params["code"],
-      r"$nolock": true
-    }, null);
+        d.db,
+        DbCommand.SYSTEM_COMMAND_COLLECTION,
+        MongoQueryMessage.OPTS_NO_CURSOR_TIMEOUT,
+        0,
+        -1,
+        {r"$eval": params["code"], r"$nolock": true},
+        null);
 
     var result = await d.db.executeDbCommand(command);
     if (result["ok"] == 1.0) {
@@ -566,9 +573,7 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
         }
 
         var table = new Table(
-          keys.map((t) => new TableColumn(t, "dynamic")).toList(),
-          out
-        );
+            keys.map((t) => new TableColumn(t, "dynamic")).toList(), out);
 
         return table;
       } else {
@@ -602,16 +607,13 @@ dynamic encodeMongoObject(input) {
     input.makeByteList();
     return input.byteArray;
   } else if (input is Map &&
-    input.keys.length == 2 &&
-    input["type"] == "Point" &&
-    input.keys.contains("coordinates") &&
-    input["coordinates"] is List &&
-    input["coordinates"].length == 2) {
+      input.keys.length == 2 &&
+      input["type"] == "Point" &&
+      input.keys.contains("coordinates") &&
+      input["coordinates"] is List &&
+      input["coordinates"].length == 2) {
     var list = input["coordinates"];
-    return {
-      "lat": list[1],
-      "lng": list[0]
-    };
+    return {"lat": list[1], "lng": list[0]};
   } else if (input is Map) {
     for (var key in input.keys.toList()) {
       input[key] = encodeMongoObject(input[key]);
