@@ -65,6 +65,18 @@ class MongoHistorianAdapter extends HistorianAdapter {
           "description": "Raw query code",
           "placeholder": "db.name"
         },
+        {
+          "name": "limit",
+          "type": "number",
+          "default": 0,
+          "description": "max number of items in the query (0 equals no limit)",
+        },
+        {
+          "name": "skip",
+          "type": "number",
+          "default": 0,
+          "description": "Amount of results to skip for the query",
+        },
       ],
       r'$columns': [
         {'name': 'success', 'type': 'bool', 'default': false},
@@ -505,6 +517,8 @@ class EvaluateRawQueryNode extends SimpleNode {
 
     var collectionName = params['collectionName'];
     var query = params['code'];
+    var limit = params['limit'] ?? 0;
+    var skip = params['skip'] ?? 0;
 
     var collection = d.db.collection(collectionName);
 
@@ -512,9 +526,21 @@ class EvaluateRawQueryNode extends SimpleNode {
     sb.raw(JSON.decode(query));
     var c = new Cursor(d.db, collection, sb);
 
-    var res = await c.stream.toList();
+    var res;
+    try {
+      c.limit = limit;
+      c.skip = skip;
+      res = await c.stream.toList();
+      for(var m in res) {
+        m['date'] = (m['date'] as DateTime).toIso8601String();
+      }
 
-    return {'success': true, 'message': JSON.encode(res)};
+      var json = JSON.encode(res);
+      return {'success': true, 'message': json};
+    } catch (e) {
+      print(e);
+      return {'success': false, 'message': e.toString()};
+    }
   }
 }
 
