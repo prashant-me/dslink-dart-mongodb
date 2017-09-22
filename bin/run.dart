@@ -52,6 +52,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
     evalQueryNode.load({
       r"$name": "Evaluate Raw Query",
       r"$is": "evaluateRawQuery",
+      r"$result": "stream",
       r"$invokable": "write",
       r"$params": [
         {
@@ -76,12 +77,11 @@ class MongoHistorianAdapter extends HistorianAdapter {
           "type": "number",
           "default": 0,
           "description": "Amount of results to skip for the query",
-        }
+        },
       ],
       r'$columns': [
-        {'name': 'success', 'type': 'bool', 'default': false},
-        {'name': 'message', 'type': 'string', 'default': ''}
-      ]
+        {"name": "json", "type": "string"}
+      ],
     });
     evalNode.load({
       r"$name": "Evaluate JavaScript",
@@ -512,7 +512,7 @@ class EvaluateRawQueryNode extends SimpleNode {
   }
 
   @override
-  onInvoke(Map<String, dynamic> params) async {
+  onInvoke(Map<String, dynamic> params) async* {
     MongoDatabaseHistorianAdapter d = node.database;
 
     var collectionName = params['collectionName'];
@@ -526,20 +526,24 @@ class EvaluateRawQueryNode extends SimpleNode {
     sb.raw(JSON.decode(query));
     var c = new Cursor(d.db, collection, sb);
 
-    var res;
     try {
       c.limit = limit;
       c.skip = skip;
-      res = await c.stream.toList();
-      for(var m in res) {
-        m['date'] = (m['date'] as DateTime).toIso8601String();
+      await for (var m in c.stream) {
+        for (var k in m.keys) {
+          if (m[k] is DateTime) {
+            m[k] = m[k].toIso8601String();
+          }
+        }
+        var encode = JSON.encode(m);
+        yield [
+          [encode]
+        ];
       }
-
-      var json = JSON.encode(res);
-      return {'success': true, 'message': json};
     } catch (e) {
-      print(e);
-      return {'success': false, 'message': e.toString()};
+      yield [
+        ['success: false ${e.toString()}']
+      ];
     }
   }
 }
