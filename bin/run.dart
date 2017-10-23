@@ -47,11 +47,46 @@ class MongoHistorianAdapter extends HistorianAdapter {
 
     var evalNode = new EvaluateJavaScriptDatabaseNode("${dbn.path}/eval");
     var evalQueryNode = new EvaluateRawQueryNode("${dbn.path}/evalQuery");
+    var evalStreamingQueryNode = new EvaluateRawStreamingQueryNode("${dbn.path}/evalStreamingQuery");
     var dbRowsWrittenNode = new SimpleNode("${dbn.path}/_rows_written");
 
     evalQueryNode.load({
       r"$name": "Evaluate Raw Query",
       r"$is": "evaluateRawQuery",
+      r"$invokable": "write",
+      r"$params": [
+        {
+          "name": "collectionName",
+          "type": "string",
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "editor": 'textarea',
+          "description": "Raw query code",
+          "placeholder": "db.name"
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "default": 0,
+          "description": "max number of items in the query (0 equals no limit)",
+        },
+        {
+          "name": "skip",
+          "type": "number",
+          "default": 0,
+          "description": "Amount of results to skip for the query",
+        },
+      ],
+      r'$columns': [
+        {"name": "json", "type": "string"}
+      ],
+    });
+
+    evalStreamingQueryNode.load({
+      r"$name": "Evaluate Raw Streaming Query",
+      r"$is": "evaluateRawStreamingQuery",
       r"$result": "stream",
       r"$invokable": "write",
       r"$params": [
@@ -83,6 +118,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
         {"name": "json", "type": "string"}
       ],
     });
+
     evalNode.load({
       r"$name": "Evaluate JavaScript",
       r"$is": "evaluateJavaScript",
@@ -110,6 +146,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
 
     provider.setNode(evalNode.path, evalNode);
     provider.setNode(evalQueryNode.path, evalQueryNode);
+    provider.setNode(evalStreamingQueryNode.path, evalStreamingQueryNode);
     provider.setNode(dbRowsWrittenNode.path, dbRowsWrittenNode);
 
     return adapter;
@@ -284,7 +321,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
             .insert({"timestamp": entry.time, "value": value});
       } catch (e, stack) {
         logger.warning(
-            "Failed to insert value ${value} from group ${entry.group} and path ${entry.path}",
+            "Failed to insert value ${value} from group ${entry
+                .group} and path ${entry.path}",
             e,
             stack);
       }
@@ -305,7 +343,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
         .list(node.valuePath)
         .listen((RequesterListUpdate update) async {
       var ghr =
-          "${link.remotePath}/${node.group.db.name}/${node.group.name}/${node.name}/getHistory";
+          "${link.remotePath}/${node.group.db.name}/${node.group.name}/${node
+          .name}/getHistory";
       var bgh = "${link.remotePath}/${node.group.name}/${node.name}/getHistory";
       if (!update.node.attributes.containsKey("@@getHistory") ||
           update.node.attributes["@@getHistory"] == bgh) {
@@ -501,10 +540,10 @@ class ColumnsMarker {
   List rows;
 }
 
-class EvaluateRawQueryNode extends SimpleNode {
+class EvaluateRawStreamingQueryNode extends SimpleNode {
   DatabaseNode node;
 
-  EvaluateRawQueryNode(String path) : super(path);
+  EvaluateRawStreamingQueryNode(String path) : super(path);
 
   @override
   onCreated() {
@@ -541,9 +580,50 @@ class EvaluateRawQueryNode extends SimpleNode {
         ];
       }
     } catch (e) {
-      yield [
-        ['success: false ${e.toString()}']
-      ];
+      rethrow;
+    }
+  }
+}
+
+class EvaluateRawQueryNode extends SimpleNode {
+  DatabaseNode node;
+
+  EvaluateRawQueryNode(String path) : super(path);
+
+  @override
+  onCreated() {
+    node = link.getNode(new Path(path).parentPath);
+  }
+
+  @override
+  onInvoke(Map<String, dynamic> params) async {
+    MongoDatabaseHistorianAdapter d = node.database;
+
+    var collectionName = params['collectionName'];
+    var query = params['code'];
+    var limit = params['limit'] ?? 0;
+    var skip = params['skip'] ?? 0;
+
+    var collection = d.db.collection(collectionName);
+
+    SelectorBuilder sb = new SelectorBuilder();
+    sb.raw(JSON.decode(query));
+    var c = new Cursor(d.db, collection, sb);
+
+    var res;
+    try {
+      c.limit = limit;
+      c.skip = skip;
+      res = await c.stream.toList();
+      for (var m in res) {
+        m['date'] = (m['date'] as DateTime).toIso8601String();
+      }
+
+      var json = JSON.encode(res);
+      return {'success': true, 'message': json};
+    } catch (e) {
+      print(e);
+      return {'success': false, 'message': e.toString()};
     }
   }
 }
