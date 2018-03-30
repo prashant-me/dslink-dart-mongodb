@@ -525,7 +525,7 @@ Db dbForPath(String path) => dbs[path.split("/").take(2).last];
 Map<String, MongoDbPool> dbs = {};
 Db dbForPath(String path) {
     var pool = dbs[path.split("/").take(2).last];
-	pool.getConnection().then((managedConnection) {
+	pool.getConnection().then(managedConnection) {
 	    return managedConnection.conn;
 	}
 	return null;
