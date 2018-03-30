@@ -5,7 +5,7 @@ import "package:mongo_dart/mongo_dart.dart";
 import "package:dslink/dslink.dart";
 import "package:dslink/utils.dart" show logger;
 import "package:dslink/nodes.dart";
-
+import 'package:connection_pool/connection_pool.dart';
 import "package:logging/logging.dart";
 
 LinkProvider link;
