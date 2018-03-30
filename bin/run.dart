@@ -14,6 +14,31 @@ import "package:mongo_dart/mongo_dart.dart";
 
 import "run_old.dart" as Old;
 
+
+/**
+ * A MongoDB connection pool
+ * author - Prashant Prashant
+ *
+ */
+class MongoConnectionPool extends ConnectionPool<Db> {
+
+  String uri;
+
+  MongoConnectionPool(String this.uri, int poolSize) : super(poolSize);
+
+  @override
+  void closeConnection(Db conn) {
+    conn.close();
+  }
+
+  @override
+  Future<Db> openNewConnection() {
+    var conn = new Db(uri);
+    return conn.open().then((_) => conn);
+  }
+}
+
+
 class MongoHistorianAdapter extends HistorianAdapter {
   @override
   List<Map<String, dynamic>> getCreateDatabaseParameters() => [
@@ -38,7 +63,21 @@ class MongoHistorianAdapter extends HistorianAdapter {
       var db = new Db(url);
       adapter = new MongoDatabaseHistorianAdapter();
       adapter.db = db;
+
+      var poolSize = 10;
+      mongoConnPool = new MongoConnectionPool(url, poolSize);
+      adapter.mongoConnectionPool = mongoConnPool;
+
       await db.open();
+
+      /* Cache all connections now */
+      var fConns = [];
+      for (var i = 0; i < poolSize; i++) {
+          fConns.add(pool.getConnection());
+      }
+      Future.wait(fConns).then((_) {
+      });
+
     }, when: const bool.fromEnvironment("dsa.mode.debug", defaultValue: false));
 
     String name = config["Name"];
@@ -119,6 +158,7 @@ class MongoHistorianAdapter extends HistorianAdapter {
 class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   Db db;
   Disposable dbStatsTimer;
+  MongoConnectionPool mongoConnPool;
 
   StreamController<ValueEntry> entryStream =
       new StreamController<ValueEntry>.broadcast();
@@ -295,6 +335,8 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
   Future close() async {
     await entryStream.close();
     await db.close();
+    mongoConnPool.closeConnections().then((_) {
+    });
   }
 
   Set<String> geopoints = new Set<String>();
@@ -557,8 +599,15 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
   @override
   onInvoke(Map<String, dynamic> params) async {
     MongoDatabaseHistorianAdapter d = node.database;
+
+    var db = d.db;
+    /* Get connection pool DB */
+    d.mongoConnPool.getConnection().then(managedConnection) {
+        db = managedConnection.conn;
+    }
+
     var command = new DbCommand(
-        d.db,
+        db,
         DbCommand.SYSTEM_COMMAND_COLLECTION,
         MongoQueryMessage.OPTS_NO_CURSOR_TIMEOUT,
         0,
@@ -566,7 +615,7 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
         {r"$eval": params["code"], r"$nolock": true},
         null);
 
-    var result = await d.db.executeDbCommand(command);
+    var result = await db.executeDbCommand(command);
     if (result["ok"] == 1.0) {
       result = result["retval"];
     }

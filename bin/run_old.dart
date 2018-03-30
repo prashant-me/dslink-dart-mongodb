@@ -271,6 +271,31 @@ class CreateConnectionNode extends SimpleNode {
   }
 }
 
+/**
+ * A MongoDB connection pool
+ * author - Prashant Prashant
+ *
+ */
+class MongoDbPool extends ConnectionPool<Db> {
+
+  String uri;
+
+  MongoDbPool(String this.uri, int poolSize) : super(poolSize);
+
+  @override
+  void closeConnection(Db conn) {
+    conn.close();
+  }
+
+  @override
+  Future<Db> openNewConnection() {
+    var conn = new Db(uri);
+    return conn.open().then((_) => conn);
+  }
+}
+
+
+
 class ConnectionNode extends SimpleNode {
   ConnectionNode(String path) : super(path, link.provider);
 
@@ -288,11 +313,15 @@ class ConnectionNode extends SimpleNode {
     }
 
     var url = configs[r"$$mongo_url"];
+	/*
     Db db = new Db(url);
-
     await db.open();
-
     dbs[name] = db;
+    */
+
+    var poolSize = 10;
+    var mongoPool = new MongoDbPool(url, poolSize);
+    dbs[name] = mongoPool;
 
     var x = {
       "Insert_Object": {
@@ -478,10 +507,26 @@ class DeleteConnectionNode extends SimpleNode {
   onInvoke(Map<String, dynamic> params) {
     link.removeNode(new Path(path).parentPath);
     link.save();
+
+    var pool = dbs[path.split("/").take(2).last];
+    pool.closeConnections().then((_) {
+    });
+
     return {};
   }
 }
-
+/*
 Map<String, Db> dbs = {};
 
+
 Db dbForPath(String path) => dbs[path.split("/").take(2).last];
+*/
+
+Map<String, MongoDbPool> dbs = {};
+Db dbForPath(String path) {
+    var pool = dbs[path.split("/").take(2).last];
+	pool.getConnection().then((managedConnection) {
+	    return managedConnection.conn;
+	}
+	return null;
+}
