@@ -11,7 +11,6 @@ import "package:dslink/utils.dart";
 import "package:stack_trace/stack_trace.dart";
 import 'package:connection_pool/connection_pool.dart';
 import "package:mongo_dart/mongo_dart.dart";
-import "run_old.dart" as Old;
 
 
 /**
@@ -437,13 +436,13 @@ main(List<String> args) async {
       useOldCode = true;
     }
   }
-
+/*
   if (argString.contains("--old, true") ||
       argString.contains("--old=true") ||
       useOldCode) {
     return Old.main(args);
   }
-
+*/
   var adapter = new MongoHistorianAdapter();
 
   new Future.delayed(const Duration(seconds: 5), () async {
