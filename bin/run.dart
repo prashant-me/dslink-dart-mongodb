@@ -11,8 +11,9 @@ import "package:dslink/utils.dart";
 import "package:stack_trace/stack_trace.dart";
 import 'package:connection_pool/connection_pool.dart';
 import "package:mongo_dart/mongo_dart.dart";
+import "package:logging/logging.dart";
 
-
+Logger mongoLogger = new Logger("DSA.MongoDB");
 /**
  * A MongoDB connection pool
  * author - Prashant Prashant
@@ -63,15 +64,15 @@ class MongoHistorianAdapter extends HistorianAdapter {
       adapter.db = db;
 
       var poolSize = 10;
-      mongoConnPool = new MongoConnectionPool(url, poolSize);
-      adapter.mongoConnectionPool = mongoConnPool;
+      var mongoConnPool = new MongoConnectionPool(url, poolSize);
+      adapter.mongoConnPool = mongoConnPool;
 
       await db.open();
 
       /* Cache all connections now */
       var fConns = [];
       for (var i = 0; i < poolSize; i++) {
-          fConns.add(pool.getConnection());
+          fConns.add(mongoConnPool.getConnection());
       }
       Future.wait(fConns).then((_) {
       });
@@ -335,6 +336,7 @@ class MongoDatabaseHistorianAdapter extends HistorianDatabaseAdapter {
     await db.close();
     mongoConnPool.closeConnections().then((_) {
     });
+    mongoLogger.info("MongoConnectionPool closed.");
   }
 
   Set<String> geopoints = new Set<String>();
@@ -600,9 +602,10 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
 
     var db = d.db;
     /* Get connection pool DB */
-    d.mongoConnPool.getConnection().then(managedConnection) {
+    d.mongoConnPool.getConnection().then((managedConnection) {
         db = managedConnection.conn;
-    }
+        mongoLogger.fine("Mongo Pool DB connection Id (${managedConnection.connId})");
+    });
 
     var command = new DbCommand(
         db,
@@ -617,6 +620,8 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
     if (result["ok"] == 1.0) {
       result = result["retval"];
     }
+
+    mongoLogger.fine("Evaluate JavaScript (${params["code"]}) => ${result}");
 
     var out = [];
 
@@ -666,7 +671,6 @@ class EvaluateJavaScriptDatabaseNode extends SimpleNode {
 
       out.add([key, value]);
     }
-
     return out;
   }
 }
